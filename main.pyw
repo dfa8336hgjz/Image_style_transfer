@@ -1,7 +1,8 @@
 import sys
+import os
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog
-from PyQt5.QtCore import Qt, QThreadPool, QRunnable
+from PyQt5.QtCore import Qt, QThreadPool, QRunnable, pyqtSlot, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage
 from ui_code.ui import *
 from transfer import transfer_Process, scaleSize
@@ -12,13 +13,16 @@ import numpy as np
 class RunningThread(QRunnable):
     def __init__(self, process):
         super(RunningThread, self).__init__()
+        self.generator = None
         self.process = process
+        self.generator = transfer_Process(self.process.contentImg, self.process.styleImg)
+
     def run(self):
-        self.process.generator = transfer_Process(self.process.contentImg, self.process.styleImg)
-        self.process.generator.run(self.process)
-        
+        self.generator.run(self.process)
+
 
 class MainUI(QWidget):
+    received = pyqtSignal(int)
     def __init__(self):
         super().__init__()
         self.app = QtWidgets.QApplication(sys.argv)
@@ -34,12 +38,13 @@ class MainUI(QWidget):
         self.ui.pushButton.clicked.connect(self.generate) 
         self.ui.otherstyle.clicked.connect(self.chooseStyleImg) 
         self.ui.actionOpen.triggered.connect(self.chooseOriginalImg)
+        self.ui.actionSaveAs.triggered.connect(self.saveAs)
+        self.received.connect(self.displayProgess)
         self.ui.horizontalLayoutWidget.hide()
 
         self.contentImg = None
         self.styleImg = None
         self.result = None
-        self.generator = None
         self.generating = False
         self.threadpool = QThreadPool()
     
@@ -72,6 +77,10 @@ class MainUI(QWidget):
 
     def chooseOriginalImg(self):
         if not self.generating:
+            self.ui.newImg.clear()
+            self.ui.newImg.setText("New image here")
+            self.ui.newImg.setStyleSheet("background-color: rgb(191, 191, 191);")
+            self.ui.label.setText("")
             dialog = QFileDialog(self)
             dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
             dialog.setNameFilter("Images (*.png *.jpg)")
@@ -107,6 +116,7 @@ class MainUI(QWidget):
             runner = RunningThread(self)
             self.threadpool.start(runner)
             
+            
         elif not self.generating:
             self.ui.label.setText("Cannot find content or style")
         else:
@@ -127,6 +137,21 @@ class MainUI(QWidget):
         self.generating = False
         self.ui.horizontalLayoutWidget.hide()
         self.ui.label.setText("")
+
+    def saveAs(self):
+        if self.result is not None:
+            options = QtWidgets.QFileDialog.Options()
+            fileName = QtWidgets.QFileDialog.getSaveFileName(self, 
+                "Save File", "", "Images (*.png *.jpg)", options = options)
+            if fileName[0]:
+                cv2.imwrite(fileName[0], self.result)
+        else:
+            self.ui.label.setText("No result to save")
+
+    @pyqtSlot(int)
+    def displayProgess(self, num):
+        self.ui.progressBar.setValue(num)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

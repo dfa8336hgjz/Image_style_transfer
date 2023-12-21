@@ -1,14 +1,13 @@
 import os
 import cv2
 import tensorflow as tf
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage
-# Load compressed models from tensorflow_hub
 os.environ['TFHUB_MODEL_LOAD_FORMAT'] = 'COMPRESSED'
 
 from pre_process import tensor_to_image
 import numpy as np
-import time
+# import time
 
 
 content_layers = ['block5_conv2']
@@ -86,6 +85,7 @@ class StyleContentModel(tf.keras.models.Model):
         return {'content': content_dict, 'style': style_dict}
 
 class transfer_Process:
+    progressChange = pyqtSignal(int)
     def __init__(self, content, style):
         self.content_img = content
         self.style_img = style
@@ -106,7 +106,7 @@ class transfer_Process:
         content_loss *= content_weight / num_content_layers
         loss = style_loss + content_loss
         return loss
-        
+
     @tf.function()
     def train_step(self, image):
         with tf.GradientTape() as tape:
@@ -121,23 +121,22 @@ class transfer_Process:
     def run(self, main_process):
         self.opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
         image = tf.Variable(self.content_img)
-        start = time.time()
+        # start = time.time()
         step = 0
         for n in range(epochs):
-            if not main_process.generating:
-                break
             for m in range(steps_per_epoch):
+                if not main_process.generating:
+                    break
                 step += 1
-                current_percent = 100 * (n * m + step) / (epochs * steps_per_epoch)
+                current_percent = 100 * step / (epochs * steps_per_epoch)
                 self.train_step(image)
-                print(".", end='', flush=True)
-                main_process.ui.progressBar.setValue(int(current_percent))
+                main_process.received.emit(int(current_percent))
             new_image = tensor_to_image(image)
             main_process.result = new_image
-            main_process.ui.newImg.setPixmap(main_process.genPixmap(main_process.ui.newImg.width(), 
+            main_process.ui.newImg.setPixmap(main_process.genPixmap(main_process.ui.newImg.width(),
                                                          main_process.ui.newImg.height(), main_process.result))
             main_process.ui.newImg.setStyleSheet("")
-            print("Train step: {}".format(step))
         main_process.generating = False
-        end = time.time()
-        print("Total time: {:.1f}".format(end-start))
+        # end = time.time()
+
+    
