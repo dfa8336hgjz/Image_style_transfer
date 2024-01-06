@@ -68,9 +68,11 @@ class StyleContentModel(tf.keras.models.Model):
         inputs = inputs*255.0
         preprocessed_input = tf.keras.applications.vgg19.preprocess_input(inputs)
         outputs = self.vgg(preprocessed_input)
+        # put style and content image into CNN to extract features
         style_outputs, content_outputs = (outputs[:self.num_style_layers],
                                             outputs[self.num_style_layers:])
 
+        # use gram matrix to calculate correlation between feature maps
         style_outputs = [gram_matrix(style_output)
                             for style_output in style_outputs]
 
@@ -97,6 +99,7 @@ class transfer_Process:
     def style_content_loss(self, outputs):
         style_outputs = outputs['style']
         content_outputs = outputs['content']
+        # mean square error for loss in style and content
         style_loss = tf.add_n([tf.reduce_mean((style_outputs[name]-self.style_targets[name])**2)
                             for name in style_outputs.keys()])
         style_loss *= style_weight / num_style_layers
@@ -112,13 +115,18 @@ class transfer_Process:
         with tf.GradientTape() as tape:
             outputs = self.extractor(image)
             loss = self.style_content_loss(outputs)
-            loss += total_variation_weight*tf.image.total_variation(image)
+            # add loss variation to reduce noise
+            loss += total_variation_weight * tf.image.total_variation(image)
 
+        # calculate gradient of loss function with respect to the result image
         grad = tape.gradient(loss, image)
+        # apply gradient descent on result image
+        # new_image = old_image - learning_rate * grad
         self.opt.apply_gradients([(grad, image)])
         image.assign(clip_0_1(image))
 
     def run(self, main_process):
+        # use Adam for optimize
         self.opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
         image = tf.Variable(self.content_img)
         # start = time.time()
