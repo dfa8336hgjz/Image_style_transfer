@@ -126,7 +126,7 @@ class transfer_Process:
         image.assign(clip_0_1(image))
 
     def run(self, main_process):
-        # use Adam for optimize
+        # use Adam for optimizing
         self.opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
         image = tf.Variable(self.content_img)
         # start = time.time()
@@ -144,6 +144,7 @@ class transfer_Process:
             main_process.ui.newImg.setPixmap(main_process.genPixmap(main_process.ui.newImg.width(),
                                                          main_process.ui.newImg.height(), main_process.result))
             main_process.ui.newImg.setStyleSheet("")
+        main_process.ui.horizontalLayoutWidget.hide()
         main_process.generating = False
         # end = time.time()
 

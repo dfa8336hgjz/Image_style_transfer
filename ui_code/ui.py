@@ -155,7 +155,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Image Style Transfer using CNN"))
         self.originalImg.setText(_translate("MainWindow", "Original Image here"))
         self.newImg.setText(_translate("MainWindow", "New image here"))
         self.label_3.setText(_translate("MainWindow", ">"))
