@@ -7,7 +7,6 @@ os.environ['TFHUB_MODEL_LOAD_FORMAT'] = 'COMPRESSED'
 
 from pre_process import tensor_to_image
 import numpy as np
-# import time
 
 
 content_layers = ['block5_conv2']
@@ -18,13 +17,12 @@ style_layers = ['block1_conv1',
                 'block4_conv1',
                 'block5_conv1']
 
-style_weight=1e-2
-content_weight=1e4
+style_weight=1e-3
+content_weight=1e3
 total_variation_weight=30
-epochs = 10
-steps_per_epoch = 100
+train_times = 10
+epochs = 100
 
-num_content_layers = len(content_layers)
 num_style_layers = len(style_layers)
 
 
@@ -50,7 +48,7 @@ def vgg_layers(layer_names):
     return model
 
 def gram_matrix(input_tensor):
-    result = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
+    result = tf.linalg.einsum('lijc,lijd->lcd', input_tensor, input_tensor)
     input_shape = tf.shape(input_tensor)
     num_locations = tf.cast(input_shape[1]*input_shape[2], tf.float32)
     return result/(num_locations)
@@ -67,8 +65,9 @@ class StyleContentModel(tf.keras.models.Model):
     def call(self, inputs):
         inputs = inputs*255.0
         preprocessed_input = tf.keras.applications.vgg19.preprocess_input(inputs)
+        
+        # put style and content image into CNN to extract feature maps
         outputs = self.vgg(preprocessed_input)
-        # put style and content image into CNN to extract features
         style_outputs, content_outputs = (outputs[:self.num_style_layers],
                                             outputs[self.num_style_layers:])
 
@@ -106,7 +105,7 @@ class transfer_Process:
 
         content_loss = tf.add_n([tf.reduce_mean((content_outputs[name]-self.content_targets[name])**2)
                                 for name in content_outputs.keys()])
-        content_loss *= content_weight / num_content_layers
+        content_loss *= content_weight / 2
         loss = style_loss + content_loss
         return loss
 
@@ -115,28 +114,25 @@ class transfer_Process:
         with tf.GradientTape() as tape:
             outputs = self.extractor(image)
             loss = self.style_content_loss(outputs)
-            # add loss variation to reduce noise
-            loss += total_variation_weight * tf.image.total_variation(image)
-
         # calculate gradient of loss function with respect to the result image
         grad = tape.gradient(loss, image)
         # apply gradient descent on result image
-        # new_image = old_image - learning_rate * grad
         self.opt.apply_gradients([(grad, image)])
         image.assign(clip_0_1(image))
 
     def run(self, main_process):
         # use Adam for optimizing
+        main_process.received.emit(0)
         self.opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
         image = tf.Variable(self.content_img)
-        # start = time.time()
         step = 0
-        for n in range(epochs):
-            for m in range(steps_per_epoch):
+        current_percent = 0
+        for n in range(train_times):
+            for m in range(epochs):
                 if not main_process.generating:
                     break
                 step += 1
-                current_percent = 100 * step / (epochs * steps_per_epoch)
+                current_percent = 100 * step / (train_times * epochs)
                 self.train_step(image)
                 main_process.received.emit(int(current_percent))
             new_image = tensor_to_image(image)
@@ -146,6 +142,4 @@ class transfer_Process:
             main_process.ui.newImg.setStyleSheet("")
         main_process.ui.horizontalLayoutWidget.hide()
         main_process.generating = False
-        # end = time.time()
-
     

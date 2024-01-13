@@ -77,9 +77,6 @@ class MainUI(QWidget):
 
     def chooseOriginalImg(self):
         if not self.generating:
-            self.ui.newImg.clear()
-            self.ui.newImg.setText("New image here")
-            self.ui.newImg.setStyleSheet("background-color: rgb(191, 191, 191);")
             self.ui.label.setText("")
             dialog = QFileDialog(self)
             dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
