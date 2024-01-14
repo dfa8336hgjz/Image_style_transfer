@@ -19,7 +19,6 @@ style_layers = ['block1_conv1',
 
 style_weight=1e-3
 content_weight=1e3
-total_variation_weight=30
 train_times = 10
 epochs = 100
 
